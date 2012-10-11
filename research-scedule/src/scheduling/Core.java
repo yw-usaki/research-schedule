@@ -11,7 +11,7 @@ import java.util.ArrayList;
  * @author 1151118
  */
 public class Core {
-    static final boolean printOutFlag = false;
+    static final boolean printOutFlag = true;
     private int ID;
     private float endTime = 0;
     private float exe_frequency;
@@ -148,6 +148,7 @@ public class Core {
      * @param ExecuteTask the ExecuteTask to set
      */
     public void setExecuteTask(Tasknode ExecuteTask) {
+        System.out.println("set ex_task on Core"+this.getCoreID() + " task"+ ExecuteTask.getID());
         this.ExecuteTask.add(ExecuteTask);
     }
 

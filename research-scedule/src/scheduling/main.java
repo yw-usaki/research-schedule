@@ -37,7 +37,7 @@ public class main{
         
         WriteResult2[] outresult = new WriteResult2[ProgramPath.length];
         //for(int i = 0; i < ProgramPass.length; i++){
-        for(int i = 0; i < 2; i++){
+        for(int i = 0; i < 6; i++){
             TaskGraph[i] = new DAG();
             Plist[i] = new Proclist();
             System.out.println("program file path :"+ProgramPath[i].getAbsolutePath());
@@ -53,7 +53,7 @@ public class main{
 
             //System.exit(0);
             startTime[i] = System.currentTimeMillis();
-            comscheduling.t_tf(TaskGraph[i], Plist[i], 4);
+            comscheduling.t_tf(TaskGraph[i], Plist[i], 1);
             
             endTime[i] =  System.currentTimeMillis();
             System.out.println("**************************************Program"+ i + " result is following****************************************************" );

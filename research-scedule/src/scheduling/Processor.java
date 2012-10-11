@@ -12,7 +12,7 @@ import java.util.ArrayList;
  * @author 1151118
  */
 public class Processor implements Serializable{
-    static final boolean printOutFlag = false;
+    static final boolean printOutFlag = true;
     private int ID;
     private int Core_number;
     private int connect_num = 0;
@@ -143,8 +143,9 @@ public class Processor implements Serializable{
 
     
     
-    //start_timeで与えた時刻以降のそのプロセッサでのタスクの処理速度を調節する
-    public DAG adjusterTBHT(DAG taskGraph,Proclist Plist,  float start_time){
+
+        //start_timeで与えた時刻以降のそのプロセッサでのタスクの処理速度を調節する
+    public DAG adjusterTBHT(DAG taskGraph,Proclist Plist, float start_time){
         int UtilizationOfProcessor;
         int addFlag = 0;
         int commflag = 0; //１なら通信時間の考慮をしたため他のプロセッサ上に配置されているタスクの周波数も再度確認変更する．フラグ
@@ -173,7 +174,7 @@ public class Processor implements Serializable{
             if(ID != -1){
                 ID = taskGraph.gettask_i(taskGraph, ID);
                 restTask = new Tasknode();
-                taskGraph.task[ID].setRestweight(taskGraph.task[ID].calculateRestWeight(divideTime, upperRate));  
+                taskGraph.task[ID].setRestweight(taskGraph.task[ID].calculateRestWeight(divideTime, upperRate));
                 taskGraph.task[ID].setWorking_time((divideTime - taskGraph.task[ID].getStart_time() < 0) ? 0 : divideTime - taskGraph.task[ID].getStart_time());
                 taskGraph.task[ID].setWorkingsub(0);
                 taskGraph.task[ID].index = (divideTime - taskGraph.task[ID].getStart_time() * upperRate < 0) ? 0 : (int)((divideTime - taskGraph.task[ID].getStart_time()) * upperRate);
@@ -190,7 +191,7 @@ public class Processor implements Serializable{
             System.out.println("resttasks size" + restTasks.size());
         //動作周波数を変更し，変更した周波数での実行時間を再計算
         //UtilizationOfProcessor = this.ProcessorUtilization(taskGraph, divideTime);
-        UtilizationOfProcessor = ((restTasks.size() -1) > 0 )?  restTasks.size() -1 : 0;
+        UtilizationOfProcessor = ((restTasks.size() -1) > 0 )? restTasks.size() -1 : 0;
         if(printOutFlag)
             System.out.println("Utilization Of Processor="+UtilizationOfProcessor);
         
@@ -348,13 +349,13 @@ public class Processor implements Serializable{
                             num++;
                          }
                         /*
-                        num= 0;
-                        while(true){
-                            if(num == restTasks.get(i).executeFrequencyStep.length)break;
-                            System.out.print(" "+restTasks.get(i).executeFrequencyStep[num]);
-                            num++;
-                         }
-                        */
+num= 0;
+while(true){
+if(num == restTasks.get(i).executeFrequencyStep.length)break;
+System.out.print(" "+restTasks.get(i).executeFrequencyStep[num]);
+num++;
+}
+*/
                         addTasknode(taskGraph, restTasks.get(i));
                         if(printOutFlag){
                             System.out.println("task "+ taskGraph.task[taskGraph.gettask_i(taskGraph, restTasks.get(i).getID())].getID()
@@ -378,7 +379,7 @@ public class Processor implements Serializable{
                 }
                 if(flag != 1){
                     divideTime+=0.02;
-                }                
+                }
                 float oldUtilizationOfProcessor = UtilizationOfProcessor;
                 //UtilizationOfProcessor = this.ProcessorUtilization(taskGraph, divideTime);
                 UtilizationOfProcessor = restTasks.size() -1 - overrayTasknum;

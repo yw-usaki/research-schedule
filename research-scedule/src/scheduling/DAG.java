@@ -8,7 +8,7 @@ import java.util.ArrayList;
 
 
 public class DAG implements Serializable, Cloneable{
-    static final boolean printOutFlag = false;
+    static final boolean printOutFlag = true;
     int total_tasks;
     int upperRate = 50;
     float restTasksProcessingTime;
@@ -124,7 +124,7 @@ public class DAG implements Serializable, Cloneable{
     	}
         setsuccessor();
         calc_bl(this);
-        if(printOutFlag)
+        //if(printOutFlag)
             outputdata();
     }
     

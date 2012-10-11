@@ -12,7 +12,7 @@ import java.util.ArrayDeque;
  * @author 1151118
  */
 public class CalculationUtil {
-    static final boolean printOutFlag = false;
+    static final boolean printOutFlag = true;
     ArrayList checkStack = new ArrayList();
     
     

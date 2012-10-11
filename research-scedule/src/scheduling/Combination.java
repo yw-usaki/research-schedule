@@ -11,7 +11,7 @@ import java.util.ArrayList;
  * @author 1151118
  */
 public class Combination {
-    static final boolean printOutFalg = false;
+    static final boolean printOutFalg = true;
     
     static void print_perm(Tasknode[] perm){
         if(printOutFalg){

@@ -8,7 +8,7 @@ import java.util.ArrayList;
 
 
 public class Proclist implements Serializable{
-    static final boolean printOutFlag = false;
+    static final boolean printOutFlag = true;
     int procnum;
     Processor[] procs;
 

@@ -160,7 +160,7 @@ public class Tasknode implements Serializable, Cloneable{
         
               
  	public void output_data(){
-            if(printOutFlag){
+            //if(printOutFlag){
  		System.out.print("task["+getID()+"] W="+getWeight()+" bl="+bl+" comnum="+getConnection_number()+" pred:");
  		for(int i=0; i<predecessor.size(); i++)System.out.print(predecessor.get(i) +" ");
  		System.out.print("succ=");
@@ -168,7 +168,7 @@ public class Tasknode implements Serializable, Cloneable{
                 System.out.print("edgecost_r:");
  		for(int i=0; i<edge_cost_r.size(); i++)System.out.print(edge_cost_r.get(i) +" ");
  		System.out.println("");
-            }
+            //}
  	}
         
         public void output_result(){

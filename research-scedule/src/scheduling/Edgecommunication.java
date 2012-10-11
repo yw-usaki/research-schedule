@@ -6,7 +6,7 @@ import java.util.ArrayList;
 
         
 public class Edgecommunication{
-    static final boolean printOutFlag = false;
+    static final boolean printOutFlag = true;
     private int CoreID;
     static int upperRate = 50;
     static int combinum = 0;
@@ -88,7 +88,7 @@ public class Edgecommunication{
                 if(printOutFlag)
                     System.out.println("■■■■■■■■■■■■■■■■■number:"+combi+" clone taskGraph and Proclist output data■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■");
                 //CloneTaskGraph.outputResult();
-                CloneProclist.outputProclist();
+                //CloneProclist.outputProclist();
               
 
                 //組み合わせ順列の結果をクローンTaskGraphに反映
@@ -159,8 +159,11 @@ public class Edgecommunication{
                         //コア側にどのタスクを処理して終了時刻が何時かを保持させる
                         CloneProclist.procs[proc_ID].Cores[core_ID].setExecuteTask(CloneTaskGraph.task[n]);
                         CloneProclist.procs[proc_ID].Cores[core_ID].setEndTime(CloneTaskGraph.task[n].getFinish_time());
+                        
+                        CloneTaskGraph.task[n].output_result();
                         for(int procI = 0; procI < CloneProclist.procnum; procI++){
                             if(CloneProclist.procs[procI].getSw() == 0){
+                                System.out.println("procID"+ CloneProclist.procs[procI].getProcID());
                                 CloneProclist.procs[procI].adjusterTBHT(CloneTaskGraph, CloneProclist, CloneTaskGraph.task[task_ID].getStart_time());
                                 updateProclist(CloneTaskGraph, CloneProclist, n);
                                 CloneProclist.procs[procI].adjusterTBHT(CloneTaskGraph, CloneProclist, CloneTaskGraph.searchLatestPredFinishTIme(task_ID)); 
@@ -214,7 +217,7 @@ public class Edgecommunication{
 
                 task_graph.setDAG(SubTaskGraph);
                 Plist.setProclist(SubProclist);
-                //task_graph.outputResult(); 
+                task_graph.outputResult(); 
                 System.gc();
             }
            System.out.println("Combi number = "+combinum);
@@ -419,7 +422,7 @@ public class Edgecommunication{
                 }
                 if(weight <= 0)break;
 
-                //System.out.println("ProcUtili="+UtilizationOfProcessor +" currentfreq = "+currentFrequency+" weight ="+ weight+" working time="+workingTime+" index="+ exeFreqStepIndex);
+                System.out.println("ProcUtili="+UtilizationOfProcessor +" currentfreq = "+currentFrequency+" weight ="+ weight+" working time="+workingTime+" index="+ exeFreqStepIndex);
             }
             if(printOutFlag)
                 System.out.println("working time ="+workingTime);
