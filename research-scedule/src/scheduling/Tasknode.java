@@ -66,6 +66,7 @@ public class Tasknode implements Serializable, Cloneable{
                 this.copyExecuteFrequency.add(task.copyExecuteFrequency.get(i));
         }
         
+        
         void copyTasknode(Tasknode task){
             this.setID(task.getID());
             this.setWeight(task.getWeight());
