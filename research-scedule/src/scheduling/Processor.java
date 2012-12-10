@@ -6,19 +6,19 @@ package scheduling;
 
 import java.io.Serializable;
 import java.util.ArrayList;
-
 /**
  *
  * @author 1151118
  */
 public class Processor implements Serializable{
-    static final boolean printOutFlag = true;
+    static final boolean printOutFlag = false;
     private int ID;
     private int Core_number;
     private int connect_num = 0;
     private int processorUtilization = 0;
-    private int sw = 0;
+    private boolean sw = false;
     private float addtime = 0;
+    float ftime = Float.MAX_VALUE;
     int Counter; //プロセッサのみの番号（スイッチを含まない）
     static int upperRate = 50;
     Core[] Cores;
@@ -27,6 +27,10 @@ public class Processor implements Serializable{
     ArrayList connect_ID_r = new ArrayList();
     ArrayList connect_s = new ArrayList();
     ArrayList connect_r = new ArrayList();
+    ArrayList<Tasknode> FixExtasks = new ArrayList<Tasknode>();
+    boolean[] flagFixExTasks = new boolean[8];
+    
+
     
     Processor(){
         
@@ -37,7 +41,8 @@ public class Processor implements Serializable{
         this.connect_num = connect_num;
         this.connect_ID = new int[connect_num];
         this.connect_ID = connect_ID;
-        sw = 1;
+        //this.flagFixExTasks = new boolean[8];
+        sw = true;
     }
         
     Processor(int ID,int connect_num, int[] connect_ID, int Core_number, float[] frequency, int Counter) {
@@ -47,11 +52,12 @@ public class Processor implements Serializable{
         this.connect_ID = new int[connect_num];
         this.connect_ID = connect_ID;
         this.Core_number = Core_number;
+        //this.flagFixExTasks = new boolean[Core_number];
         this.Cores = new Core[Core_number];
         for(int i = 0; i < this.Core_number; i++){
             Cores[i] = new Core(i, frequency);
+            this.flagFixExTasks[i] = true;
         }
-        
     }
     
     void setProcessor(Processor proc){
@@ -85,6 +91,11 @@ public class Processor implements Serializable{
             this.connect_ID_r.add(proc.connect_ID_r.get(i));
             this.connect_r.add(proc.connect_r.get(i));
         }
+        if(!getSw()){
+            for(int i = 0; i < proc.flagFixExTasks.length; i++){
+                this.flagFixExTasks[i] = proc.flagFixExTasks[i];
+            }
+        }
     }
     
     int getCoreID(int i){
@@ -105,296 +116,365 @@ public class Processor implements Serializable{
         return -1;
     }
    
-   int CheckCoreUsed(float time){
-       int counter = 0;
-       for(int i = 0; i < getCore_number(); i++){
-           if(Cores[i].CheckUsed(time) != -1)counter++;
-       }
-       return counter;
-   }
-
-
 
     void outputProcData(){
-        if(printOutFlag){
-            System.out.print("ProcID = "+ID+"Connection number ="+connect_num +" Core number = "+getCore_number());
-            if(this.getSw() == 1)System.out.print(" this is SW");
-            System.out.print("\n Connection:");
-            for(int i = 0;i < connect_ID.length; i++)
-                System.out.print(connect_ID[i]+ " ");
-            System.out.print("connect_s.size="+connect_s.size()+"\n connect  s:");
-            for(int i = 0;i < connect_s.size(); i++)
-                System.out.print(((Processor)connect_s.get(i)).getProcID() + " ");
-            System.out.print("\n Connection:");
-            for(int i = 0;i < connect_ID_r.size(); i++)
-                System.out.print(connect_ID_r.get(i) + " ");
-            System.out.print("\n connect  r:");
-            for(int i = 0;i < connect_ID_r.size(); i++)
-                System.out.print(((Processor)connect_r.get(i)).getProcID() + " ");
-            System.out.print("\n");
+        System.out.print("ProcID = "+ID+"Connection number ="+connect_num +" Core number = "+getCore_number());
+        if(this.getSw())System.out.print(" this is SW");
+        System.out.print("\n Connection:");
+        for(int i = 0;i < connect_ID.length; i++)
+            System.out.print(connect_ID[i]+ " ");
+        System.out.print("connect_s.size="+connect_s.size()+"\n connect  s:");
+        for(int i = 0;i < connect_s.size(); i++)
+            System.out.print(((Processor)connect_s.get(i)).getProcID() + " ");
+        System.out.print("\n Connection:");
+        for(int i = 0;i < connect_ID_r.size(); i++)
+            System.out.print(connect_ID_r.get(i) + " ");
+        System.out.print("\n connect  r:");
+        for(int i = 0;i < connect_ID_r.size(); i++)
+            System.out.print(((Processor)connect_r.get(i)).getProcID() + " ");
+        System.out.print("\n");
 
-            for(int i = 0;i < getCore_number(); i++){
-                System.out.print("  ");
-                Cores[i].outputCoreData();
-            }
+        for(int i = 0;i < getCore_number(); i++){
+            System.out.print("  ");
+            Cores[i].outputCoreData();
         }
     }
 
-
+    void redivideTask(DAG taskGraph, Proclist Plist, float dividetime){
+        for(int i = 0; i < Cores.length; i++){
+            if(Cores[i].CheckUsed(dividetime)){
+                
+                if(Cores[i].ExTaskIndex >= 0)Cores[i].redivideTask(taskGraph, Plist, dividetime);
+            }
+        }
+    }
     
-    
-
-        //start_timeで与えた時刻以降のそのプロセッサでのタスクの処理速度を調節する
-    public DAG adjusterTBHT(DAG taskGraph,Proclist Plist, float start_time){
+    void fixOfTBHT(DAG taskGraph, Proclist Plist, float stime, float etime, float weight, boolean flag){
         int UtilizationOfProcessor;
-        int addFlag = 0;
-        int commflag = 0; //１なら通信時間の考慮をしたため他のプロセッサ上に配置されているタスクの周波数も再度確認変更する．フラグ
-        float currentFrequency;
-        float divideTime;
-        Tasknode restTask;
-        ArrayList<Integer> restTasksID = new ArrayList<Integer>();
-        Edgecommunication edcom = new Edgecommunication();
-        CalculationUtil calutil = new CalculationUtil();
+        int[] ExtaskIndex = new int[Core_number];
+        boolean[] inRestTasks = new boolean[Core_number];
+        float currentFrequency = 0;
+        float oldcurrentFrequency = 0;
+        float Exweight = 0;
+        float Stime = findEarliestTaskStartTime(flag);
         
-        divideTime = calutil.carryUp(start_time);
-        if(printOutFlag){
-            System.out.println("☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆in method adjusterTBHT☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆");
-            System.out.println("start Time = "+ calutil.carryUp(start_time));
+        boolean ExFlag = false;
+        ArrayList<Tasknode> restTasks = new ArrayList<Tasknode>();
+        FixofTurboBoostandHyperThreading fixTBHT = new FixofTurboBoostandHyperThreading();
+        if(flag)System.out.println("in processor" +getProcID()+" fixOfTBHT stime "+Stime +" weight "+ weight+" currentWeight "+ Exweight);
+        CalculationUtil calUtil = new CalculationUtil();
+        ftime = Float.MAX_VALUE;
+        //initialization
+        for(int i = 0; i < Core_number; i++){
+            inRestTasks[i] = true;
         }
-        //edcom.communicationTime(taskGraph, Plist, taskGraph.gettask_i(taskGraph, task.getID()));
-        //開始直後に対象となるタスクノードを見つけ出し,resttasksに入れる
-        for(int coreI = 0; coreI < this.Core_number; coreI++){
-            if(printOutFlag){
-                System.out.print("Cores["+coreI+"].ExecuteTask:");
-                for(int i = 0; i < Cores[coreI].ExecuteTask.size(); i++){
-                    System.out.print(" "+((Tasknode)Cores[coreI].ExecuteTask.get(i)).getID());
-                }System.out.println("");
-            }
-            int ID = Cores[coreI].CheckUsed(divideTime);
-            if(ID != -1){
-                ID = taskGraph.gettask_i(taskGraph, ID);
-                restTask = new Tasknode();
-                taskGraph.task[ID].setRestweight(taskGraph.task[ID].calculateRestWeight(divideTime, upperRate));
-                taskGraph.task[ID].setWorking_time((divideTime - taskGraph.task[ID].getStart_time() < 0) ? 0 : divideTime - taskGraph.task[ID].getStart_time());
-                taskGraph.task[ID].setWorkingsub(0);
-                taskGraph.task[ID].index = (divideTime - taskGraph.task[ID].getStart_time() * upperRate < 0) ? 0 : (int)((divideTime - taskGraph.task[ID].getStart_time()) * upperRate);
-                restTasksID.add(taskGraph.task[ID].getID());
-                restTask.initializeRestTask(taskGraph.task[ID], divideTime);
-                if(printOutFlag)
-                    restTask.output_result();
-                restTasks.add(restTask);
-                if(printOutFlag)
-                    System.out.println(" task"+ taskGraph.task[ID].getID()+" addFLAG="+ addFlag +" working time "+(divideTime - taskGraph.task[ID].getStart_time()));
+        
+        //etime = calUtil.carryUp100(etime);
+        UtilizationOfProcessor = this.ProcessorUtilization(Stime);
+        //UtilizationOfProcessor = restTasks.size() <= 0 ?  0 : restTasks.size() -1;
+        currentFrequency = Cores[0].getFrequency(UtilizationOfProcessor);
+        oldcurrentFrequency = currentFrequency;
+        
+        if(taskGraph.total_tasks < 60)redivideTask(taskGraph, Plist, Stime);
+        
+        //start タスクへの影響の有無を調べ，影響ありならresttasksに追加
+        for(int coreI = 0; coreI < Core_number; coreI++){
+            if(inRestTasks[coreI]){
+                if(Cores[coreI].findExeTask(Stime)){
+                    if(flag)System.out.println("add resttasks with task" + Cores[coreI].getExecuteTask(Cores[coreI].ExTaskIndex).getID());
+                    restTasks.add(Cores[coreI].getExecuteTask(Cores[coreI].ExTaskIndex));
+                    ExtaskIndex[coreI] = Cores[coreI].getExecuteTask(Cores[coreI].ExTaskIndex).getID();
+                    inRestTasks[coreI] = false;
+                    ExFlag = true;
+                }
             }
         }
-        if(printOutFlag)
-            System.out.println("resttasks size" + restTasks.size());
-        //動作周波数を変更し，変更した周波数での実行時間を再計算
-        //UtilizationOfProcessor = this.ProcessorUtilization(taskGraph, divideTime);
-        UtilizationOfProcessor = ((restTasks.size() -1) > 0 )? restTasks.size() -1 : 0;
-        if(printOutFlag)
-            System.out.println("Utilization Of Processor="+UtilizationOfProcessor);
         
-        int overrayTasknum = 0;
-        //動作周波数の調節を開始
-        while(true){
-            int flag = 0;
-            if(UtilizationOfProcessor >= 8)UtilizationOfProcessor = 7;
+
+        
+           
+        
+        for(;; Stime+=0.1){
+            //プロセッサの使用率と動作周波数を決定
+            Stime = calUtil.carryUp10(Stime);
+            
+            //start タスクへの影響の有無を調べ，影響ありならresttasksに追加
+            for(int coreI = 0; coreI < Core_number; coreI++){
+                if(inRestTasks[coreI]){
+                    if(Cores[coreI].findExeTask(Stime)){
+                        if(flag)System.out.println("add resttasks with task" + Cores[coreI].getExecuteTask(Cores[coreI].ExTaskIndex).getID());
+                        restTasks.add(Cores[coreI].getExecuteTask(Cores[coreI].ExTaskIndex));
+                        ExtaskIndex[coreI] = Cores[coreI].getExecuteTask(Cores[coreI].ExTaskIndex).getID();
+                        inRestTasks[coreI] = false;
+                        ExFlag = true;
+                    }
+                }
+            }
+            UtilizationOfProcessor = this.ProcessorUtilization(Stime);
+            //UtilizationOfProcessor = restTasks.size() <= 0 ?  0 : restTasks.size() -1;
             currentFrequency = Cores[0].getFrequency(UtilizationOfProcessor);
-            //新規で設定されたdividetimeに対して同時に処理される予定のタスクノードがあれば追加する
-            //if(addFlag == 1){
-                for(int coreI = 0; coreI < this.Core_number; coreI++){
-                    addFlag = 1;
-                    for(int exeTaskI = 0; exeTaskI < Cores[coreI].ExecuteTask.size(); exeTaskI++){
-                            int ID = Cores[coreI].CheckUsed(divideTime);
-                            if(ID != -1){
-                                //System.out.print("hit task ID="+ID + " addaFlag="+ addFlag);
-                                //すでにresttasksに入っているかどうかの判断　入っていたらFLAG=0，そうでなければFLAG=1
-                                for(int m = 0; m < restTasks.size(); m++)
-                                    if(ID == restTasks.get(m).getID()){
-                                        addFlag = 0;
-                                        //System.out.print(" task ID="+ID +" addFlag="+addFlag);
-                                        break;
-                                    }
-                                for(int x : restTasksID){
-                                    if(ID == x){
-                                        addFlag = 0;
-                                        break;
-                                    }
-                                }
-                                //System.out.println(" → "+ addFlag);
-                                
-                                if(addFlag == 1){
-                                    if(printOutFlag)
-                                        System.out.println("☆☆☆add task"+ taskGraph.task[taskGraph.gettask_i(taskGraph, ID)].getID()+" dividetime="+divideTime+" UtilizationPRoc="+UtilizationOfProcessor+" resttasks.size="+restTasks.size()+" addFLAG="+ addFlag);
-                                    ID = taskGraph.gettask_i(taskGraph, ID);
-                                    restTask = new Tasknode();
-                                    taskGraph.task[ID].setRestweight(taskGraph.task[ID].calculateRestWeight(divideTime, upperRate));
-                                    taskGraph.task[ID].setWorking_time((divideTime - taskGraph.task[ID].getStart_time() < 0) ? 0 : divideTime - taskGraph.task[ID].getStart_time());
-                                    taskGraph.task[ID].index = (divideTime - taskGraph.task[ID].getStart_time() * upperRate < 0) ? 0 : (int)((divideTime - taskGraph.task[ID].getStart_time()) * upperRate);
-                                    restTasksID.add(taskGraph.task[ID].getID());
-                                    restTask.initializeRestTask(taskGraph.task[ID], divideTime);
-                                    restTasks.add(restTask);
-                                    if(printOutFlag){
-                                        for(int j = 0; j < restTasks.size(); j++)
-                                            restTasks.get(j).output_result();
-                                    }
-                                }
 
-                            }
-                    }
+            //end タスクへの影響の有無を調べ，影響ありならresttasksに追加
+            if(restTasks.size() != 0){
+                if(flag){
+                    System.out.print("†††††††††† stime "+String.format("%4.2f", Stime) + " currentWeight "+ Exweight +" limitweight "+ String.format(" %4.2f", weight) + " currentFreq "+ currentFrequency+" ExTaskIndex:");
+                    for(int x : ExtaskIndex)
+                        System.out.print(" "+x);
+                    System.out.println();
                 }
-               // addFlag = 0;
-            //}
-            //System.out.println("divitime "+ divideTime+"Utilizationprocessor"+UtilizationOfProcessor);
-            if(!restTasks.isEmpty()){
-                overrayTasknum = 0;
-                for(int i = 0; i < restTasks.size(); i++){
-                    //各タスクノードに対して0.01づつ処理時間を加算していき，その時の動作周波数＊0.01分の処理量を減らす
-                    //そのあとに各タスクノードの対応する処理時間の配列に動作周波数を入れていく
-                    if(restTasks.get(i).getID() != 0){
-                        if(checkPred(restTasks, restTasks.get(i))){
-                            
-                            if(restTasks.get(i).getRestweight() >= currentFrequency/upperRate){
-                                restTasks.get(i).setRestweight(restTasks.get(i).getRestweight() - currentFrequency/upperRate);
-                                float time = (divideTime - restTasks.get(i).getStart_time());
-                                if(time <= 0)time = 0;
-                                int index = (int)(time * upperRate);
-                                restTasks.get(i).setWorkingsub(restTasks.get(i).getWorkingsub() + (float)0.02);
-                                if(index < restTasks.get(i).executeFrequencyStep.size()){
-                                    restTasks.get(i).executeFrequencyStep.set(index , currentFrequency);
-                                    restTasks.get(i).index++;
-                                } else
-                                    restTasks.get(i).executeFrequencyStep.add(currentFrequency);
-                                
-                            }else if(restTasks.get(i).getRestweight() < currentFrequency/upperRate){
-                                float time = (divideTime - restTasks.get(i).getStart_time());
-                                if(time <= 0)time = 0;
-                                int index = (int)(time * upperRate);
-                                //System.out.print("restweight="+restTasks.get(i).getRestweight());
-                                //restTasks.get(i).setWorkingsub(restTasks.get(i).getWorkingsub() + restTasks.get(i).getRestweight() / currentFrequency);
-                                if(index < restTasks.get(i).executeFrequencyStep.size()){
-                                    restTasks.get(i).executeFrequencyStep.set(index , restTasks.get(i).getRestweight());
-                                    restTasks.get(i).index++;
-                                }else
-                                    restTasks.get(i).executeFrequencyStep.add(restTasks.get(i).getRestweight());
-                                restTasks.get(i).setRestweight(0);
-                                
-                            }
-                        }else{
-                            overrayTasknum++;
-                        }
-                    }
-                    //もし，残りの処理量が0になったやつの処理
-                    if(restTasks.get(i).getRestweight() <= 0){
-                        flag = 1;
-                        if(printOutFlag){
-                            System.out.println("#"+(int)((divideTime - restTasks.get(i).getFinish_time()) * upperRate));
-                            System.out.print("task "+ restTasks.get(i).getID());
-                            System.out.print("old star time "+ taskGraph.task[taskGraph.gettask_i(taskGraph, restTasks.get(i).getID())].getStart_time());
-                            System.out.println("old finish time "+ taskGraph.task[taskGraph.gettask_i(taskGraph, restTasks.get(i).getID())].getFinish_time());
-                        }
-
-                        //対象のタスクノードの処理時間と終了時間を更新
-                        if(printOutFlag){
-                            for(int j = 0; j < restTasks.size(); j++)
-                                restTasks.get(j).output_result();
-                        }
-                        restTasks.get(i).setWorking_time(
-                                    calutil.carryUp(
-                                        restTasks.get(i).getWorking_time()
-                                        + restTasks.get(i).getWorkingsub()
-                                    )
-                                );
-                        restTasks.get(i).setFinish_time(
-                                    calutil.carryUp(
-                                        restTasks.get(i).getStart_time()
-                                        +restTasks.get(i).getWorking_time()
-                                    )
-                                );
-                        restTasks.get(i).setWorkingsub(0);
-                        calutil.checkTaskWeight(restTasks.get(i));
-                        Cores[restTasks.get(i).allocate_core_ID].setEndTime(restTasks.get(i).getFinish_time());
-                        if(printOutFlag)
-                            System.out.println("procの終了時間を更新２proc="+Plist.procs[restTasks.get(i).allocate_proc_ID].getProcID()
-                                            +" core="+Cores[restTasks.get(i).allocate_core_ID].getCoreID()
-                                            +" end time ="+Cores[restTasks.get(i).allocate_core_ID].getEndTime());
-                        Cores[restTasks.get(i).allocate_core_ID].nomalAdjuster(restTasks.get(i));
-                        for(int num = 0; num < restTasks.get(i).successor.size(); num++){
-                            if(printOutFlag)
-                                System.out.println("successer ID="+(Integer)restTasks.get(i).successor.get(num));
-                            int index = taskGraph.gettask_i(taskGraph, (Integer)restTasks.get(i).successor.get(num));
-                            if(printOutFlag)
-                                System.out.println("index="+index+" resttasksget(i)="+restTasks.get(i));
-                            if(index != -1)
-                                taskGraph.task[index].adjusterSameProcessor(taskGraph, restTasks.get(i).getFinish_time());
-                        }
-                        for(int num = 0; num < restTasks.size();num++){
-                            int index = taskGraph.gettask_i(taskGraph, restTasks.get(num).getID());
-                            restTasks.get(num).setStart_time(taskGraph.task[index].getStart_time());
-                        }
-                        if(printOutFlag)
-                            System.out.println("task "+ restTasks.get(i).getID()+" new star time "+ restTasks.get(i).getStart_time()+" new finish time "+ restTasks.get(i).getFinish_time());
-                        int num = 0;
-                        
-
-                        //終了時刻以降の周波数ステップを0リセット
-                        num =(int)((divideTime - restTasks.get(i).getStart_time()) * upperRate) + 1;
-                        if(num < 0)num =0;
-                        //System.out.println("num="+num);
-                        //System.out.println("num="+num+" starTime="+restTasks.get(i).getStart_time()+" divideTime="+divideTime);
-                        while(num < restTasks.get(i).executeFrequencyStep.size()){
-                            restTasks.get(i).executeFrequencyStep.set(num, (float)0);
-                            //restTasks.get(i).executeFrequencyStep.remove(num);
-                            num++;
-                         }
-                        /*
-num= 0;
-while(true){
-if(num == restTasks.get(i).executeFrequencyStep.length)break;
-System.out.print(" "+restTasks.get(i).executeFrequencyStep[num]);
-num++;
-}
-*/
-                        addTasknode(taskGraph, restTasks.get(i));
-                        if(printOutFlag){
-                            System.out.println("task "+ taskGraph.task[taskGraph.gettask_i(taskGraph, restTasks.get(i).getID())].getID()
-                                    +" new star time "+ taskGraph.task[taskGraph.gettask_i(taskGraph, restTasks.get(i).getID())].getStart_time()
-                                    +" new finish time "+ taskGraph.task[taskGraph.gettask_i(taskGraph, restTasks.get(i).getID())].getFinish_time());
-                        }
-                        divideTime += 0.02;
-                        
-                        
-                        restTasks.remove(i);
-                        //UtilizationOfProcessor = this.ProcessorUtilization(taskGraph, divideTime);
-                        if(printOutFlag)
-                            System.out.println("★☆☆");
-                        UtilizationOfProcessor = restTasks.size() -1;
-                        if(restTasks.size() != (UtilizationOfProcessor + 1)){
-                           // UtilizationOfProcessor = restTasks.size() - 1;
-                        }
-                                    
-                        
-                    }
+                
+                if(fixTBHT.compareTaskWeight(restTasks, Exweight)){
+                    if(flag)System.out.println("exWeight = "+Exweight);
+                    break;
                 }
-                if(flag != 1){
-                    divideTime+=0.02;
+                
+                //動作周波数の変更が行われた場合の処理
+                if(oldcurrentFrequency != currentFrequency ){
+                    //これまでの変更された情報の保存
+                    if(flag)System.out.println("old freq "+ oldcurrentFrequency +" currentfreq "+ currentFrequency);
+                    break;
                 }
-                float oldUtilizationOfProcessor = UtilizationOfProcessor;
-                //UtilizationOfProcessor = this.ProcessorUtilization(taskGraph, divideTime);
-                UtilizationOfProcessor = restTasks.size() -1 - overrayTasknum;
-                //if(restTasks.size() < UtilizationOfProcessor)
-                    addFlag = 1;
-            }else{
+                
+                //一つ前の動作周波数を保存
+                oldcurrentFrequency = currentFrequency;
+                
+            }
+            Exweight += currentFrequency * 0.1;
+            if(Exweight >= weight){
+                if(flag)System.out.println("break" +Exweight +" "+ weight);
                 break;
             }
         }
-        if(printOutFlag)
-            System.out.println("end in method adjusterTBHT");
-        return taskGraph;
-  
+        if(restTasks.size() != 0){
+            //これまでの変更された情報の保存
+            for(int restTaskIndex = 0; restTaskIndex < restTasks.size(); restTaskIndex++){
+                if(flag)System.out.println("update");
+                fixTBHT.splitTasknode(taskGraph, Plist, restTasks.get(restTaskIndex), Cores[restTasks.get(restTaskIndex).allocate_core_I], Stime, oldcurrentFrequency, flag);
+            }
+
+        }
+        if(ExFlag)ftime = Stime;
+        if(flag)System.out.println("in processor end " +getProcID()+" fixOfTBHT stime "+Stime +" weight "+weight+" ftime "+ftime);
     }
     
+    float searchNextStime(){
+        float Stime = Float.MAX_VALUE;
+        
+        for(int i = 0; i < Core_number; i++){
+            //System.out.println("corenumber" +Core_number+" i"+i);
+            float time = Cores[i].getExTaskStime();
+            if(Stime > time)Stime = time;
+        }
+        
+        return Stime;       
+    }
+    
+    float findEarliestTaskFinishTime(){
+        float minimumTime = Float.MAX_VALUE;
+        int CoreIndex = -1;
+        for(int coreI = 0; coreI < this.Core_number; coreI++){
+            //System.out.println("core id "+coreI+" Exindex "+Cores[coreI].ExTaskIndex);
+            
+            if(Cores[coreI].ExTaskIndex != -1){
+
+                float time = Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex).finish_time.get(Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex).start_time.size() - 1);
+                if(time == -1){
+                    int index = Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex).start_time.size() == 1 ? 0 : Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex).start_time.size() - 2;
+                    time = Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex).finish_time.get(index);
+                }
+                /*
+                System.out.println(
+                        "core id "+coreI+
+                        " Exindex "+Cores[coreI].ExTaskIndex +
+                        " task"+Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex).getID()+
+                        " ftime"+time);
+                        * 
+                        */
+                if(time < minimumTime && time != -1){
+                    //System.out.println("time" + time);
+                    minimumTime = time;
+                    CoreIndex = coreI;
+                }
+            }
+        }
+        
+        return minimumTime;
+    }
+
+    float findEarliestTaskStartTime(boolean flag){
+        float minimumTime = Float.MAX_VALUE;
+        int CoreIndex = -1;
+        for(int coreI = 0; coreI < this.Core_number; coreI++){
+            if(flag)System.out.println("core id "+coreI+" Exindex "+Cores[coreI].ExTaskIndex);
+            
+            if(Cores[coreI].ExTaskIndex != -1){
+                if(Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex).start_time.get(Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex).start_time.size() - 1) != -1
+                        && Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex).finish_time.get(Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex).finish_time.size() - 1) == -1){
+                    float time = Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex).start_time.get(Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex).start_time.size() - 1);
+                    
+                    if(time == -1){
+                        int index = Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex).start_time.size() == 1 ? 0 : Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex).start_time.size() - 2;
+                        time = Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex).start_time.get(index);
+                    }
+                    if(flag){
+                        System.out.println(
+                                "core id "+coreI+
+                                " Exindex "+Cores[coreI].ExTaskIndex +
+                                " task"+Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex).getID()+
+                                " ftime"+time);
+                    }
+                    if(time < minimumTime && time != -1){
+                        if(flag)System.out.println("time" + time);
+                        minimumTime = time;
+                        CoreIndex = coreI;
+                    }
+                }
+            }
+        }
+        
+        return minimumTime;
+    }
+    
+    
+    float findNextSwitchTime(float time, boolean flag){
+        float minimumTime = Float.MAX_VALUE;
+        int CoreIndex = -1;
+        //System.out.println("================== in findNextEndTIme function======================");
+        for(int coreI = 0; coreI < this.Core_number; coreI++){
+            //System.out.println("core id "+coreI+" Exindex "+Cores[coreI].ExTaskIndex);
+            
+            if(Cores[coreI].ExTaskIndex != -1){
+                //select nest time
+                Tasknode task = Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex);
+                float stime = task.start_time.get(task.start_time.size() - 1);
+                float etime = task.finish_time.get(task.finish_time.size() -1);
+                /*
+                     System.out.println(
+                            "core id "+coreI+
+                            " Exindex "+Cores[coreI].ExTaskIndex +
+                            " task"+task.getID()+
+                            " ftime"+time);
+                            * 
+                            */
+                    if(time < minimumTime && stime != -1){
+                        //System.out.println("time" + time);
+                        minimumTime = stime;
+                        CoreIndex = coreI;
+                    }
+            }
+        }
+        
+        return minimumTime;
+    }
+    
+    float findMinimumTaskWeight(DAG taskGraph, Proclist Plist, float stime, boolean flag){
+        float miniWeight = Float.MAX_VALUE;
+        int CoreIndex = -1;
+        for(int coreI = 0; coreI < this.Core_number; coreI++){
+            if(flag)System.out.println("proc "+getProcID()+" core id "+coreI+" Exindex "+Cores[coreI].ExTaskIndex+" stime "+ stime);
+            
+            if(Cores[coreI].ExTaskIndex != -1){
+                int taskI = taskGraph.gettask_i(taskGraph, Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex).getID());
+                calcStartTime(taskGraph, Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex), Plist, flag);
+                if(flag)System.out.print("after calcStartTime ");
+                if(flag)Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex).output_result();
+                if(
+                    (Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex).finish_time.get(Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex).finish_time.size() - 1) ==  -1)
+                        &&
+                    (Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex).start_time.get(Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex).start_time.size() - 1) !=  -1)
+                        &&
+                    (Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex).start_time.get(Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex).start_time.size() - 1) <= stime)
+                        ){
+                    if(flag){
+                        System.out.println(
+                                "core id "+coreI+
+                                " Exindex "+Cores[coreI].ExTaskIndex +
+                                " task "+Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex).getID()+
+                                " weight "+Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex).weight.get(Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex).weight.size() - 1));
+                    }
+
+                    float weight = Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex).weight.get(Cores[coreI].ExecuteTask.get(Cores[coreI].ExTaskIndex).weight.size() - 1);
+                    if(flag)System.out.print("weight" + weight);
+                    if(weight < miniWeight){
+                        if(flag)System.out.print(" update");
+                        miniWeight = weight;
+                        CoreIndex = coreI;
+                    }
+                    if(flag)System.out.println();
+                }
+            }
+        }
+        
+        return miniWeight;
+    }
+    
+    boolean calcStartTime(DAG taskGraph, Tasknode task, Proclist Plist, boolean flag){
+        int predIndex;
+        int procIndex = task.allocate_proc_I;
+        float maxPredFtime = 0;
+        float maxProcFtime = 0;
+        float commTime = 0;
+        CalculationUtil calUtil = new CalculationUtil();
+        if(flag)System.out.println("******* calc start time for task"+ task.getID());
+        for(int i = 0; i < task.predecessor.size(); i++){
+            predIndex = taskGraph.gettask_i(taskGraph, task.predecessor.get(i));
+                
+            if(flag)taskGraph.task[predIndex].output_result();
+            int procPredIndex = Plist.procs[task.allocate_proc_I].Cores[task.allocate_core_I].SearchExePredTaskIndex(task.getID());
+            if(flag)System.out.println("procPredIndex "+procPredIndex);
+            if(procPredIndex != -1){
+                Tasknode procPredTask = Plist.procs[task.allocate_proc_I].Cores[task.allocate_core_I].ExecuteTask.get(procPredIndex);
+                if(flag)procPredTask.output_result();
+                if(procPredTask.finish_time.get(procPredTask.finish_time.size() -1) == -1){
+                    if(flag)System.out.println("proc predecessor is not finished");
+                    return false;
+                }else{
+                    maxProcFtime = procPredTask.finish_time.get(procPredTask.finish_time.size() -1) + procPredTask.communicationTime;
+                }
+            }
+            //親タスクの処理完了時刻が不定であればfalse
+            //すでにStartTimeを計算した物もFalse
+            if(taskGraph.task[predIndex].finish_time.get(taskGraph.task[predIndex].finish_time.size() -1) == -1 || task.start_time.get(0) != -1){
+                if(flag)System.out.println("predecessor is not finished");
+                return false;
+            }
+            else{
+                float predTime = taskGraph.task[predIndex].finish_time.get(taskGraph.task[predIndex].finish_time.size() -1);
+                if(maxPredFtime == 0)maxPredFtime = predTime;
+                if(maxPredFtime < predTime){
+                    maxPredFtime = predTime;
+                    if(flag)System.out.println("maxpredFtime update: new predFtime"+predTime +" maxpredFtime"+maxPredFtime);
+                }
+                if(flag)System.out.println("maxPredFtime "+ maxPredFtime);
+                if(task.allocate_proc_I != taskGraph.task[predIndex].allocate_proc_I){
+                    commTime += calUtil.calculationOfHopCost(Plist.procs[task.allocate_proc_I], Plist.procs[taskGraph.task[predIndex].allocate_proc_I].getProcID(), 0);
+                    if(flag)System.out.println(" comm time "+ commTime+" task"+task.getID() +" proc" +task.allocate_proc_I+" predtask"+taskGraph.task[predIndex].getID() +" proc"+taskGraph.task[predIndex].allocate_proc_I);
+                }
+                if(flag)System.out.println("maxProcFtime "+ maxProcFtime);
+            }
+        }
+        float stime;
+        //ルートのデータ入力
+        if(task.predecessor.size() == 0){
+            task.start_time.set(0, (float)0);
+        }else{
+            if(maxPredFtime < maxProcFtime)stime = maxProcFtime + commTime;
+            else stime = maxPredFtime + commTime;
+            task.start_time.set(0, stime);
+        }
+        if(flag)task.output_result();
+        return true;
+    }
+    
+    
+    //全てのコアのExTaskIndexが-1であるならTrue
+    boolean checkAllExTaskIndex(){
+        for(int coreI = 0; coreI < Core_number; coreI++){
+            if(Cores[coreI].ExTaskIndex != -1)return false;
+        }
+        return true;
+    }
+
     boolean checkPred(ArrayList<Tasknode> restTasks, Tasknode currentTask){
         for(int i = 0; i < currentTask.predecessor.size(); i++){
             for(Tasknode x : restTasks){
@@ -414,21 +494,28 @@ num++;
     
 
     //timeで指定された時間のプロセッサの使用率を返す
-    int ProcessorUtilization(DAG taskgraph, float time){
-        int count = 0,num;
+    int ProcessorUtilization(float time){
+        ArrayList<Integer> coreID = new ArrayList<Integer>();
+        int count = -1,num;
+        
         for(int i = 0; i < this.Core_number; i++){
-            if((num = this.Cores[i].CheckUsed(time)) != -1){
-                //System.out.println("被ってるコア："+ this.Cores[i].getCoreID());
-                count++;
+            if(this.Cores[i].ExTaskIndex != -1){
+                if(this.Cores[i].CheckUsed(time)){
+                    //System.out.println("被ってるコア："+ this.Cores[i].getCoreID());
+                    coreID.add(Cores[i].getCoreID());
+                    count++;
+                }
             }
         }
+        if(count == -1)count = 0;
+        //System.out.print("proc used "+count +" "+ coreID);
         return count;
     }
     
-    public int getSw() {
+    public boolean getSw() {
         return sw;
     }
-    public void setSw(int sw) {
+    public void setSw(boolean sw) {
         this.sw = sw;
     }
     public int getCore_number() {
@@ -449,5 +536,20 @@ num++;
     public void setCore_number(int Core_number) {
         this.Core_number = Core_number;
     }
+    public Tasknode getFixExTasks(int index){
+        return this.FixExtasks.get(index);
+    }
+    void addFixExTasks(Tasknode task){
+        this.FixExtasks.add(task);
+    }
+    public void removeFixExTasks(int index){
+        this.FixExtasks.remove(index);
+    }
+    public void outputFixExtasks(){
+        for(Tasknode x : FixExtasks){
+            System.out.print(" "+ x.getID());
+        }
+    }
+        
 }
 

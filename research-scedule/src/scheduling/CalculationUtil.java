@@ -12,15 +12,15 @@ import java.util.ArrayDeque;
  * @author 1151118
  */
 public class CalculationUtil {
-    static final boolean printOutFlag = true;
+    static final boolean printOutFlag = false;
     ArrayList checkStack = new ArrayList();
     
     
     //targetIDで指定したProcまでの通信に必要なHop数を返す
-    int searchNode(Processor Proc, int targetID, int counter){
+    int calculationOfHopCost(Processor Proc, int targetID, int counter){
         int ConnectionDiray = 0;
         //if(printOutFlag)
-            //System.out.println(Proc.getProcID() + " "+ targetID);
+           // System.out.println(Proc.getProcID() + " "+ targetID);
         checkStack.add(Proc.getProcID());
         //if(printOutFlag)
             //System.out.println(checkStack);
@@ -34,7 +34,7 @@ public class CalculationUtil {
             Processor proc = bfs_queue.poll();
             int hop_counter = hop_queue.poll();
             //if(printOutFlag)
-              //  System.out.println(proc.getProcID()+" hop:"+hop_counter);
+                //System.out.println(proc.getProcID()+" hop:"+hop_counter);
 
             if(proc.getProcID() == targetID)
                 return hop_counter;
@@ -54,12 +54,30 @@ public class CalculationUtil {
         return false;
     }
     
-    float carryUp(float value){
+    float carryUp1(float value){
+        if(value == 0)return 0;
+        value = (float)((int)(value + 0.5));
+        return value;
+    }
+
+    float carryUp10(float value){
+        if(value == 0)return 0;
+        value = (float)((int)(value * 10 + 0.5)) / 10;
+        return value;
+    }
+    
+    float carryUp100(float value){
+        if(value == 0)return 0;
+        value = (float)((int)(value * 100 + 0.5)) / 100;
+        return value;
+    }
+    
+    float carryUp100000(float value){
         if(value == 0)return 0;
         value = (float)((int)(value * 100000 + 5)) / 100000;
         return value;
     }
-    
+    /*
     void checkTaskWeight(Tasknode task){
         float removeTime = 0;
         float overWeight = 0;
@@ -71,8 +89,8 @@ public class CalculationUtil {
                 removeTime += 1 / task.UpperRate;
                 task.executeFrequencyStep.remove(i);
             }else{
-                if((overWeight = task.getWeight() - sum) < (task.executeFrequencyStep.get(i) / task.UpperRate)){
-                    task.executeFrequencyStep.set(i, task.getWeight() - sum);
+                if((overWeight = task.weight.get(0) - sum) < (task.executeFrequencyStep.get(i) / task.UpperRate)){
+                    task.executeFrequencyStep.set(i, task.weight.get(0) - sum);
                     flag = true;
                 }
                 sum += task.executeFrequencyStep.get(i) / task.UpperRate;
@@ -80,6 +98,8 @@ public class CalculationUtil {
         }
     }
     
+    * 
+    */
     //残りのタスクを逐次実行した場合の処理時間と通信時間の合計を計算し，格納
     void calculateRestTasksProcessingTime(DAG TaskGraph, Proclist Plist, int currentTaskI){
         int ProcIndex = -1;
@@ -90,7 +110,7 @@ public class CalculationUtil {
         float latestProcEndTime = 0;
         
         for(int i = 1; i < Plist.procnum; i++){
-            if(Plist.procs[i].getSw() != 1){
+            if(!Plist.procs[i].getSw()){
                 if(ProcIndex == -1)ProcIndex = i;
                 for(int j = 0; j < Plist.procs[i].getCore_number(); j++){
                     float time = Plist.procs[i].Cores[j].getEndTime();
@@ -118,11 +138,11 @@ public class CalculationUtil {
                 if(i < TaskGraph.total_tasks)
                 for(int j = 0; j < TaskGraph.task[i].successor.size(); j++){
                     //saccessorが未割当である場合，これから起こるであろう通信遅延を追加
-                    int successorI = TaskGraph.gettask_i(TaskGraph, (Integer)TaskGraph.task[i].successor.get(j));
-                    if((TaskGraph.task[successorI].getWorking_time() == 0) && (TaskGraph.task[i].allocate_proc_ID != -1)){
+                    int successorI = TaskGraph.gettask_i(TaskGraph, TaskGraph.task[i].successor.get(j));
+                    if((TaskGraph.task[successorI].working_time.get(0) == 0) && (TaskGraph.task[i].allocate_proc_I != -1)){
                         if(printOutFlag)
                             System.out.println(i + "taskftagadfga = "+ TaskGraph.task[i].getID());
-                        communicationTime += searchNode(Plist.procs[TaskGraph.task[i].allocate_proc_ID], Plist.procs[ProcIndex].getProcID(), 0);
+                        communicationTime += calculationOfHopCost(Plist.procs[TaskGraph.task[i].allocate_proc_I], Plist.procs[ProcIndex].getProcID(), 0);
                     }
                 }
             }
@@ -138,19 +158,20 @@ public class CalculationUtil {
         float MaxFinishTime = currentTaskFinishTime;
         int index = -1;
         for(Tasknode x : TaskGraph.task){
-            if(MaxFinishTime <= x.getFinish_time()){
-                MaxFinishTime = x.getFinish_time();
+            if(MaxFinishTime <= x.finish_time.get(0)){
+                MaxFinishTime = x.finish_time.get(0);
                 index = x.getID();
             }
         }
         return index;
     }
     
+    //TaskGraph全体の残り処理量を計算してかえす
     float calculateRestTotalTaskWeights(DAG TaskGraph){
         float totalWeight = 0;
         for(Tasknode x : TaskGraph.task){
-            if(x.getWorking_time() == 0)
-                totalWeight += x.getWeight();
+            if(x.working_time.get(0) == 0)
+                totalWeight += x.weight.get(0);
         }
         return totalWeight;
     }

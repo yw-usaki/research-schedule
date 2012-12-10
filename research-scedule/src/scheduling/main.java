@@ -1,12 +1,13 @@
 package scheduling;
 
+
 import java.awt.Color;
 import java.io.File;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
-import scheduling.WriteResult2.MyRect;
+import scheduling.WriteResult3.MyRect;
 
 public class main{
 
@@ -29,15 +30,16 @@ public class main{
         Plist = new Proclist[ProgramPath.length];
         TaskGraph = new DAG[ProgramPath.length];
         startTime = new long[ProgramPath.length];//アルゴリズムの実行時間計測用
-        endTime = new long[ProgramPath.length];//アルゴリズムの実行時間計測用
+        endTime = new long[ProgramPath.length];  //アルゴリズムの実行時間計測用
        
         CalculationUtil calc = new CalculationUtil();
         CopyUtil copyUtil = new CopyUtil();
         Sort objsort = new Sort();
+        MasterServer server = new MasterServer();
         
-        WriteResult2[] outresult = new WriteResult2[ProgramPath.length];
+        WriteResult3[] outresult = new WriteResult3[ProgramPath.length];
         //for(int i = 0; i < ProgramPass.length; i++){
-        for(int i = 0; i < 6; i++){
+    for(int i = 5; i < 6; i++){
             TaskGraph[i] = new DAG();
             Plist[i] = new Proclist();
             System.out.println("program file path :"+ProgramPath[i].getAbsolutePath());
@@ -58,9 +60,13 @@ public class main{
             endTime[i] =  System.currentTimeMillis();
             System.out.println("**************************************Program"+ i + " result is following****************************************************" );
             result_output(TaskGraph[i], Plist[i]);
-            outresult[i] = new WriteResult2("result" + i , Plist[i], TaskGraph[i]);
-        }
+            outresult[i] = new WriteResult3("result" + i , Plist[i], TaskGraph[i]);
+            server.run(TaskGraph[i], Plist[i]);
+            
+    }
         
+        
+    
         for(int i = 0; i < ProgramPath.length; i++){
             System.out.print("Program "+ i + " scheduling time is : ");
             System.out.println(endTime[i] - startTime[i]);

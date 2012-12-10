@@ -8,7 +8,7 @@ import java.util.ArrayList;
 
 
 public class Proclist implements Serializable{
-    static final boolean printOutFlag = true;
+    static final boolean printOutFlag = false;
     int procnum;
     Processor[] procs;
 
@@ -30,11 +30,19 @@ public class Proclist implements Serializable{
         return clone;
     }
     
+    //オリジナルのPlistの内容を複製
     void setProclist(Proclist original){
         this.procnum = original.procnum;
         for(int i = 0; i < this.procnum; i++){
             this.procs[i].setProcessor(original.procs[i]);
         }
+    }
+    
+    boolean checkAllCoresExTaskIndedx(){
+        for(Processor p : procs){
+            if(!p.checkAllExTaskIndex())return false;
+        }
+        return true;
     }
     
     public void set_initialdata(){
@@ -99,7 +107,9 @@ public class Proclist implements Serializable{
 		outputProclist();
  		
  	}
-    int[] getexeProcID(int taskID){
+    
+    //taskIDで示されるタスクの処理されているプロセッサ及びコアのIDを返す．
+    int[] getexeProcIDCoreID(int taskID){
         int ProcID = 0;
         int CoreID = 0;
         int[] result = new int[2];
@@ -122,6 +132,8 @@ public class Proclist implements Serializable{
             procs[i].outputProcData();
         }
     }
+    
+    //親ノード，子ノードの関連付けを行う
     void setConnPointer(){
         for(int i = 0; i < procs.length; i++){
             for(int j = 0; j < procs[i].getConnect_num(); j++){

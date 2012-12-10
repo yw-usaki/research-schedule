@@ -71,7 +71,7 @@ public class WriteResult2 extends JFrame{
             Graphics2D g2 = (Graphics2D)g;
             //プロセッサのIDとコアのIDを描画
             for(int i = 0; i < Plist.procnum; i++){
-                if(Plist.procs[i].getSw() != 1){
+                if(!Plist.procs[i].getSw()){
                     g2.setColor(Color.BLACK);
                     g2.drawString("Proc "+ Plist.procs[i].getProcID(), initialx, Plist.procs[i].Counter * (Plist.procs[i].getCore_number() +1) * 50 + initialy);
                     for(int j = 0; j < Plist.procs[i].getCore_number(); j++){
@@ -84,11 +84,11 @@ public class WriteResult2 extends JFrame{
             for(int i = 0; i < TaskGraph.total_tasks; i++){
                 int counter = 0;
                 float length = 0;
-                            taskx = TaskGraph.task[i].getStart_time() * up + 100;
-                            tasky = Plist.procs[TaskGraph.task[i].allocate_proc_ID].Counter 
-                                    * (Plist.procs[TaskGraph.task[i].allocate_proc_ID].getCore_number() +1) * 50
-                                    + (TaskGraph.task[i].allocate_core_ID + 1) * 50 + initialy;
-                            length = TaskGraph.task[i].getWorking_time() * up  * 10;
+                            taskx = TaskGraph.task[i].start_time.get(0) * up + 100;
+                            tasky = Plist.procs[TaskGraph.task[i].allocate_proc_I].Counter 
+                                    * (Plist.procs[TaskGraph.task[i].allocate_proc_I].getCore_number() +1) * 50
+                                    + (TaskGraph.task[i].allocate_core_I + 1) * 50 + initialy;
+                            length = TaskGraph.task[i].working_time.get(0) * up  * 10;
                             
                             //タスクIDの会得（黒字）
                             g2.setColor(Color.BLACK);
@@ -96,8 +96,8 @@ public class WriteResult2 extends JFrame{
                             if(!str.equalsIgnoreCase("n0")){
                                 g2.drawString(str, (float)taskx, (float)tasky - 5);
                                 
-                                String stime = String.format("%.3f", TaskGraph.task[i].getStart_time());
-                                String ftime = String.format("%.3f", TaskGraph.task[i].getFinish_time());
+                                String stime = String.format("%.3f", TaskGraph.task[i].start_time.get(0));
+                                String ftime = String.format("%.3f", TaskGraph.task[i].finish_time.get(0));
 
                                 g2.drawString(stime, (float)taskx, (float)tasky +20);
                                 g2.drawString(ftime, (float)taskx , (float)tasky +32);
@@ -130,7 +130,7 @@ public class WriteResult2 extends JFrame{
                             Line2D endline = new Line2D.Float(taskx, tasky -10, taskx, tasky+ 1 + height +10);
                             g2.draw(endline);
                             g2.setColor(Color.cyan);
-                            taskx = TaskGraph.task[i].getFinish_time() * up + 100;
+                            taskx = TaskGraph.task[i].finish_time.get(0) * up + 100;
                             Line2D endline2 = new Line2D.Float(taskx, tasky -5, taskx, tasky + 1 + height +5);
                             g2.draw(endline2);
             

@@ -8,14 +8,14 @@ import java.util.ArrayList;
 
 
 public class DAG implements Serializable, Cloneable{
-    static final boolean printOutFlag = true;
-    int total_tasks;
+    static final boolean printOutFlag = false;
+    public int total_tasks;
     int upperRate = 50;
     float restTasksProcessingTime;
     String fileName;
-    Tasknode[] task;
+    public Tasknode[] task;
 
-    DAG(){
+    public DAG(){
         restTasksProcessingTime = 0;
        // System.out.println("create DAG");
     }	
@@ -46,11 +46,10 @@ public class DAG implements Serializable, Cloneable{
     }
 
     float selectLatestFinishTime(){
-        
-        float finishTime = this.task[0].getFinish_time();
+        float finishTime = this.task[0].finish_time.get(0);
         for(int i = 0; i < total_tasks; i++){
-            if(finishTime < task[i].getFinish_time()){
-               finishTime = task[i].getFinish_time();
+            if(finishTime < task[i].finish_time.get(0)){
+               finishTime = task[i].finish_time.get(0);
             }
         }
         return finishTime;
@@ -61,8 +60,8 @@ public class DAG implements Serializable, Cloneable{
         float maxFinishTime = 0;
         for(int i = 0; i < task[index].predecessor.size(); i++){
             int predIndex = gettask_i(this, (Integer)task[index].predecessor.get(i));
-            if(maxFinishTime < task[predIndex].getFinish_time())
-                maxFinishTime = task[predIndex].getFinish_time();
+            if(maxFinishTime < task[predIndex].finish_time.get(0))
+                maxFinishTime = task[predIndex].finish_time.get(0);
         }
         
         return maxFinishTime;
@@ -101,7 +100,8 @@ public class DAG implements Serializable, Cloneable{
                         //System.out.println(sline[0]+sline[1]+sline[2]);
                         task[i].setID(Integer.parseInt(sline[0]));
                         //System.out.println(i+" "+task[i].number+" ");
-                        task[i].setWeight(Integer.parseInt(sline[1]));
+                        task[i].weight.set(0, Float.parseFloat(sline[1]));
+                        task[i].totalWeight = task[i].weight.get(0);
                         //System.out.print(task[i].weight+" ");
                         task[i].setConnection_number(Integer.parseInt(sline[2]));
                         //System.out.print(task[i].connection_number+" ");
@@ -125,7 +125,6 @@ public class DAG implements Serializable, Cloneable{
         setsuccessor();
         calc_bl(this);
         //if(printOutFlag)
-            outputdata();
     }
     
     public void calc_bl(DAG task_graph){
@@ -134,8 +133,8 @@ public class DAG implements Serializable, Cloneable{
                 if(task_graph.task[i].getConnection_number() != 0)
                         task[i].bl = 10000;
                         for(int j=0; j<task_graph.task[i].getConnection_number(); j++){
-                              if(task[i].bl < task[(Integer)task[i].predecessor.get(j)].bl + task[(Integer)task[i].predecessor.get(j)].getWeight()){
-                                task[i].bl = task[(Integer)task[i].predecessor.get(j)].bl +  (int)task[(Integer)task[i].predecessor.get(j)].getWeight();
+                              if(task[i].bl < task[(Integer)task[i].predecessor.get(j)].bl + task[(Integer)task[i].predecessor.get(j)].weight.get(0)){
+                                 task[i].bl = (int)(task[(Integer)task[i].predecessor.get(j)].bl + task[(Integer)task[i].predecessor.get(j)].weight.get(0));
                               }
                         }
                 //System.out.println(task[i].bl);
